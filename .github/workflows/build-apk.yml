@@ -1,0 +1,48 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Create Android App
+        run: |
+          cordova create android-app com.ummidwar.arkan "Ummidwar Arkan Eanath Group"
+          cd android-app
+          cordova platform add android
+          rm -rf www/*
+          cp ../index.html www/index.html
+
+      - name: Build APK
+        run: |
+          cd android-app
+          cordova build android --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ummidwar-Arkan-Eanath-Group-APK
+          path: android-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
