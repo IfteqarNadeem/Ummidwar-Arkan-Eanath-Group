@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,26 +25,64 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Cordova
-        run: npm install -g cordova
+      - name: Install Cordova and ImageMagick
+        run: |
+          npm install -g cordova
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
 
       - name: Create Android App
         run: |
           cordova create android-app com.ummidwar.arkan "Ummidwar Arkan Eanath Group"
           cd android-app
-          cordova platform add android
+
           rm -rf www/*
           cp ../index.html www/index.html
 
-          mkdir -p res/icon/android
-          cp ../app_icon.png res/icon/android/icon.png
+          cordova platform add android
+          cordova plugin add cordova-plugin-file
+          cordova plugin add cordova-plugin-x-socialsharing
+
+      - name: Apply Custom App Icon
+        run: |
+          BASE="android-app/platforms/android/app/src/main/res"
+
+          mkdir -p "$BASE/mipmap-mdpi"
+          mkdir -p "$BASE/mipmap-hdpi"
+          mkdir -p "$BASE/mipmap-xhdpi"
+          mkdir -p "$BASE/mipmap-xxhdpi"
+          mkdir -p "$BASE/mipmap-xxxhdpi"
+
+          convert app_icon.png -resize 48x48 "$BASE/mipmap-mdpi/icon.png"
+          convert app_icon.png -resize 72x72 "$BASE/mipmap-hdpi/icon.png"
+          convert app_icon.png -resize 96x96 "$BASE/mipmap-xhdpi/icon.png"
+          convert app_icon.png -resize 144x144 "$BASE/mipmap-xxhdpi/icon.png"
+          convert app_icon.png -resize 192x192 "$BASE/mipmap-xxxhdpi/icon.png"
 
           python3 - <<'PY'
           from pathlib import Path
-          p=Path("config.xml")
-          s=p.read_text()
-          s=s.replace("</platform>", '    <icon src="res/icon/android/icon.png" />\n</platform>') if "</platform>" in s else s.replace("</widget>", '  <platform name="android">\n    <icon src="res/icon/android/icon.png" />\n  </platform>\n</widget>')
-          p.write_text(s)
+          import re
+
+          manifest = Path(
+              "android-app/platforms/android/app/src/main/AndroidManifest.xml"
+          )
+
+          s = manifest.read_text()
+
+          s = re.sub(
+              r'android:icon="[^"]+"',
+              'android:icon="@mipmap/icon"',
+              s
+          )
+
+          if 'android:roundIcon=' in s:
+              s = re.sub(
+                  r'android:roundIcon="[^"]+"',
+                  'android:roundIcon="@mipmap/icon"',
+                  s
+              )
+
+          manifest.write_text(s)
           PY
 
       - name: Build APK
